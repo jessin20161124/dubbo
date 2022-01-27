@@ -46,6 +46,10 @@ public class DubboSpringInitializer {
     private DubboSpringInitializer() {
     }
 
+    /**
+     * 对当前registry进行初始化
+     * @param registry
+     */
     public static void initialize(BeanDefinitionRegistry registry) {
 
         // Spring ApplicationContext may not ready at this moment (e.g. load from xml), so use registry as key
@@ -111,6 +115,7 @@ public class DubboSpringInitializer {
             ApplicationModel applicationModel;
             if (findContextForApplication(ApplicationModel.defaultModel()) == null) {
                 // first spring context use default application instance
+                // todo 使用默认的application model
                 applicationModel = ApplicationModel.defaultModel();
                 logger.info("Use default application: " + safeGetModelDesc(applicationModel));
             } else {
@@ -120,6 +125,7 @@ public class DubboSpringInitializer {
             }
 
             // init ModuleModel
+            // todo 使用默认的moduleModel
             moduleModel = applicationModel.getDefaultModule();
             context.setModuleModel(moduleModel);
             logger.info("Use default module model of target application: " + safeGetModelDesc(moduleModel));
@@ -133,6 +139,7 @@ public class DubboSpringInitializer {
             context.getModuleModel().getAttributes().putAll(context.getModuleAttributes());
         }
 
+        // todo 注册module到这个app context里，关联到这个app context
         // bind dubbo initialization context to spring context
         registerContextBeans(beanFactory, context);
 

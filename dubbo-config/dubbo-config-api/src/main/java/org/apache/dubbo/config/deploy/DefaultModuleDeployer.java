@@ -121,6 +121,11 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
         }
     }
 
+    /**
+     * 这里导出service provider
+     * @return
+     * @throws IllegalStateException
+     */
     @Override
     public synchronized Future start() throws IllegalStateException {
         if (isStopping() || isStopped() || isFailed()) {

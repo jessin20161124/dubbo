@@ -16,6 +16,14 @@
  */
 package org.apache.dubbo.config.metadata;
 
+import static java.util.Collections.emptyList;
+import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_PROTOCOL;
+import static org.apache.dubbo.common.constants.CommonConstants.METADATA_SERVICE_PORT_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.METADATA_SERVICE_PROTOCOL_KEY;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
@@ -29,15 +37,6 @@ import org.apache.dubbo.metadata.MetadataService;
 import org.apache.dubbo.rpc.Protocol;
 import org.apache.dubbo.rpc.ProtocolServer;
 import org.apache.dubbo.rpc.model.ApplicationModel;
-
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import static java.util.Collections.emptyList;
-import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_PROTOCOL;
-import static org.apache.dubbo.common.constants.CommonConstants.METADATA_SERVICE_PORT_KEY;
-import static org.apache.dubbo.common.constants.CommonConstants.METADATA_SERVICE_PROTOCOL_KEY;
 
 /**
  * Export metadata service
@@ -157,6 +156,10 @@ public class ConfigurableMetadataServiceExporter {
     }
 
 
+    /**
+     * provider 曝光metadataService，方便对方获取到当前instance的所有provider url meta
+     * @return
+     */
     private ServiceConfig<MetadataService> buildServiceConfig() {
         ApplicationConfig applicationConfig = getApplicationConfig();
         ServiceConfig<MetadataService> serviceConfig = new ServiceConfig<>();

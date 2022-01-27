@@ -100,6 +100,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
         //register service bean
         ModuleModel moduleModel = DubboBeanUtils.getModuleModel(applicationContext);
+        // 将当前serviceConfig注册到configManager中，后续在DubboDeployApplicationListener监听到refreshedEvent时，
+        // 统一export
         moduleModel.getConfigManager().addService(this);
         moduleModel.getDeployer().setPending();
     }

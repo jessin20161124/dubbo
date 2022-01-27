@@ -16,16 +16,11 @@
  */
 package org.apache.dubbo.config.metadata;
 
-import org.apache.dubbo.common.URL;
-import org.apache.dubbo.common.logger.Logger;
-import org.apache.dubbo.common.logger.LoggerFactory;
-import org.apache.dubbo.common.resource.Disposable;
-import org.apache.dubbo.common.utils.StringUtils;
-import org.apache.dubbo.metadata.MetadataInfo;
-import org.apache.dubbo.metadata.MetadataService;
-import org.apache.dubbo.registry.client.ServiceDiscovery;
-import org.apache.dubbo.registry.support.RegistryManager;
-import org.apache.dubbo.rpc.model.ApplicationModel;
+import static java.util.Collections.emptySortedSet;
+import static java.util.Collections.unmodifiableSortedSet;
+import static org.apache.dubbo.common.URL.buildKey;
+import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
+import static org.apache.dubbo.common.utils.CollectionUtils.isEmpty;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,12 +33,16 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-
-import static java.util.Collections.emptySortedSet;
-import static java.util.Collections.unmodifiableSortedSet;
-import static org.apache.dubbo.common.URL.buildKey;
-import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
-import static org.apache.dubbo.common.utils.CollectionUtils.isEmpty;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.resource.Disposable;
+import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.metadata.MetadataInfo;
+import org.apache.dubbo.metadata.MetadataService;
+import org.apache.dubbo.registry.client.ServiceDiscovery;
+import org.apache.dubbo.registry.support.RegistryManager;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 
 /**
  * Implementation providing remote RPC service to facilitate the query of metadata information.
@@ -88,6 +87,7 @@ public class MetadataServiceDelegation implements MetadataService, Disposable {
         SortedSet<URL> bizURLs = new TreeSet<>(URLComparator.INSTANCE);
         List<ServiceDiscovery> serviceDiscoveries = registryManager.getServiceDiscoveries();
         for (ServiceDiscovery sd : serviceDiscoveries) {
+            // todo 获取到每个service discovery的provider url metadata，给consumer调用
             MetadataInfo metadataInfo = sd.getLocalMetadata();
             Map<String, SortedSet<URL>> serviceURLs = metadataInfo.getExportedServiceURLs();
             for (Map.Entry<String, SortedSet<URL>> entry : serviceURLs.entrySet()) {

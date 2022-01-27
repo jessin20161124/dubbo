@@ -54,6 +54,7 @@ public class DubboDeployApplicationListener implements ApplicationListener<Appli
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
+        // todo 从appContext获取对应的app model
         this.applicationModel = DubboBeanUtils.getApplicationModel(applicationContext);
         this.moduleModel = DubboBeanUtils.getModuleModel(applicationContext);
         // listen deploy events and publish DubboApplicationStateEvent

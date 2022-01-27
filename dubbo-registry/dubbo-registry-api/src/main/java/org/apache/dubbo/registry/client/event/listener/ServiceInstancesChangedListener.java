@@ -16,23 +16,10 @@
  */
 package org.apache.dubbo.registry.client.event.listener;
 
-import org.apache.dubbo.common.URL;
-import org.apache.dubbo.common.URLBuilder;
-import org.apache.dubbo.common.logger.Logger;
-import org.apache.dubbo.common.logger.LoggerFactory;
-import org.apache.dubbo.common.threadpool.manager.ExecutorRepository;
-import org.apache.dubbo.common.utils.CollectionUtils;
-import org.apache.dubbo.common.utils.ConcurrentHashSet;
-import org.apache.dubbo.metadata.MetadataInfo;
-import org.apache.dubbo.metadata.MetadataInfo.ServiceInfo;
-import org.apache.dubbo.registry.NotifyListener;
-import org.apache.dubbo.registry.client.DefaultServiceInstance;
-import org.apache.dubbo.registry.client.ServiceDiscovery;
-import org.apache.dubbo.registry.client.ServiceInstance;
-import org.apache.dubbo.registry.client.event.RetryServiceInstancesChangedEvent;
-import org.apache.dubbo.registry.client.event.ServiceInstancesChangedEvent;
-import org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils;
-import org.apache.dubbo.rpc.model.ScopeModelUtil;
+import static org.apache.dubbo.common.constants.RegistryConstants.EMPTY_PROTOCOL;
+import static org.apache.dubbo.common.constants.RegistryConstants.ENABLE_EMPTY_PROTECTION_KEY;
+import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
+import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.getExportedServicesRevision;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,11 +38,23 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.dubbo.common.constants.RegistryConstants.EMPTY_PROTOCOL;
-import static org.apache.dubbo.common.constants.RegistryConstants.ENABLE_EMPTY_PROTECTION_KEY;
-import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
-import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.getExportedServicesRevision;
+import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.threadpool.manager.ExecutorRepository;
+import org.apache.dubbo.common.utils.CollectionUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
+import org.apache.dubbo.metadata.MetadataInfo;
+import org.apache.dubbo.metadata.MetadataInfo.ServiceInfo;
+import org.apache.dubbo.registry.NotifyListener;
+import org.apache.dubbo.registry.client.DefaultServiceInstance;
+import org.apache.dubbo.registry.client.ServiceDiscovery;
+import org.apache.dubbo.registry.client.ServiceInstance;
+import org.apache.dubbo.registry.client.event.RetryServiceInstancesChangedEvent;
+import org.apache.dubbo.registry.client.event.ServiceInstancesChangedEvent;
+import org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils;
+import org.apache.dubbo.rpc.model.ScopeModelUtil;
 
 /**
  * TODO, refactor to move revision-metadata mapping to ServiceDiscovery. Instances should already being mapped with metadata when reached here.
@@ -133,6 +132,8 @@ public class ServiceInstancesChangedListener {
             String revision = entry.getKey();
             List<ServiceInstance> subInstances = entry.getValue();
             ServiceInstance instance = selectInstance(subInstances);
+            // 一个revision有多个相同的instance，找到一个就可以了，都要设置metadata
+            // 获取该实例的所有接口的元数据，并按照protocol -> protocol_serviceKey -> revision list归类到localServiceToRevisions中
             MetadataInfo metadata = serviceDiscovery.getRemoteMetadata(revision, instance);
             parseMetadata(revision, metadata, localServiceToRevisions);
             // update metadata into each instance, in case new instance created.
@@ -148,6 +149,7 @@ public class ServiceInstancesChangedListener {
         if (emptyNum != 0) {// retry every 10 seconds
             hasEmptyMetadata = true;
             if (retryPermission.tryAcquire()) {
+                // 有没找到metaInfo的，重新进入这个方法，重新查找
                 if (retryFuture != null && !retryFuture.isDone()) {
                     // cancel last retryFuture because only one retryFuture will be canceled at destroy().
                     retryFuture.cancel(true);
@@ -164,12 +166,16 @@ public class ServiceInstancesChangedListener {
 
         Map<String, Map<Set<String>, Object>> protocolRevisionsToUrls = new HashMap<>();
         Map<String, Object> newServiceUrls = new HashMap<>();
+        // localServiceToRevisions ： protocol -> protocol_serviceKey -> revision list
+        // revisionToInstances ：revision -> instance(protocol endpoint)
+        // 进而找到每个接口的所有实例列表
         for (Map.Entry<String, Map<String, Set<String>>> entry : localServiceToRevisions.entrySet()) {
             String protocol = entry.getKey();
             entry.getValue().forEach((protocolServiceKey, revisions) -> {
                 Map<Set<String>, Object> revisionsToUrls = protocolRevisionsToUrls.computeIfAbsent(protocol, k -> new HashMap<>());
                 Object urls = revisionsToUrls.get(revisions);
                 if (urls == null) {
+                    // 找到该revision下的所有服务实例
                     urls = getServiceUrlsCache(revisionToInstances, revisions, protocol);
                     revisionsToUrls.put(revisions, urls);
                 }
@@ -178,6 +184,7 @@ public class ServiceInstancesChangedListener {
             });
         }
 
+        // 最终得到com.jessin.practice.dubbo.service.DomainService:1.0.2:dubbo -> 服务实例（ip:port）
         this.serviceUrls = newServiceUrls;
         this.notifyAddressChanged();
     }
@@ -196,6 +203,7 @@ public class ServiceInstancesChangedListener {
             listenerQueue.offer(listenerWithKey);
         }
 
+        // 如果本地缓存有，会进行通知，通知的对象时服务实例(ip:port)
         List<URL> urls = getAddresses(serviceKey, listener.getConsumerUrl());
         if (CollectionUtils.isNotEmpty(urls)) {
             listener.notify(urls);
@@ -299,7 +307,15 @@ public class ServiceInstancesChangedListener {
         return emptyMetadataNum;
     }
 
+    /**
+     * protocol(dubbo) -> protocol_serviceKey(com.jessin.practice.dubbo.service.DomainService:1.0.2:dubbo) -> revision list
+     * @param revision
+     * @param metadata
+     * @param localServiceToRevisions
+     * @return
+     */
     protected Map<String, Map<String, Set<String>>> parseMetadata(String revision, MetadataInfo metadata, Map<String, Map<String, Set<String>>> localServiceToRevisions) {
+        // 拿到该服务提供的所有接口列表
         Map<String, ServiceInfo> serviceInfos = metadata.getServices();
         for (Map.Entry<String, ServiceInfo> entry : serviceInfos.entrySet()) {
             String protocol = entry.getValue().getProtocol();
@@ -328,6 +344,7 @@ public class ServiceInstancesChangedListener {
                 if (ServiceInstanceMetadataUtils.hasEndpoints(i)) {
                     DefaultServiceInstance.Endpoint endpoint = ServiceInstanceMetadataUtils.getEndpoint(i, protocol);
                     if (endpoint != null && endpoint.getPort() != i.getPort()) {
+                        // 当port不一样时，以endpoint中的为准
                         urls.add(((DefaultServiceInstance) i).copyFrom(endpoint).toURL());
                         continue;
                     }

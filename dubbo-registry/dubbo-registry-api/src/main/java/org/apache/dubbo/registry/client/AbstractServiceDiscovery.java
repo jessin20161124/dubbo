@@ -16,6 +16,14 @@
  */
 package org.apache.dubbo.registry.client;
 
+import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_CLUSTER_KEY;
+import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
+import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.EXPORTED_SERVICES_REVISION_PROPERTY_NAME;
+import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.isValidInstance;
+import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.setMetadataStorageType;
+
+import java.util.List;
+import java.util.Set;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
@@ -30,15 +38,6 @@ import org.apache.dubbo.registry.client.metadata.MetadataUtils;
 import org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils;
 import org.apache.dubbo.registry.client.metadata.store.MetaCacheManager;
 import org.apache.dubbo.rpc.model.ApplicationModel;
-
-import java.util.List;
-import java.util.Set;
-
-import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_CLUSTER_KEY;
-import static org.apache.dubbo.metadata.RevisionResolver.EMPTY_REVISION;
-import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.EXPORTED_SERVICES_REVISION_PROPERTY_NAME;
-import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.isValidInstance;
-import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.setMetadataStorageType;
 
 /**
  * Each service discovery is bond to one application.
@@ -76,25 +75,39 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
         this.applicationModel = ApplicationModel.defaultModel();
         this.registryURL = registryURL;
         this.serviceName = serviceName;
+        // 注册的provider url，完整的保存在这里
         this.metadataInfo = new MetadataInfo(serviceName);
         this.metaCacheManager = new MetaCacheManager(getCacheNameSuffix());
     }
 
+    /**
+     * todo 这里将真正的服务实例，注册到zk上
+     *    注册时机是在spring refresh event后，所有的provider接口曝光到本地后，再进行，保证拿到完整的接口meta info，
+     *    但是service meta info未暴露到zk上
+     *    只注册一次？？，如果某个接口有上下线，需要重新拉取meta info??
+     * @throws RuntimeException
+     */
     public synchronized void register() throws RuntimeException {
+        // 创建的instance，带有metaData
         this.serviceInstance = createServiceInstance(this.metadataInfo);
         if (!isValidInstance(this.serviceInstance)) {
             logger.warn("No valid instance found, stop registering instance address to registry.");
             return;
         }
 
+        // 根据service meta info，计算版本信息（md5），如果后续provider url有变化，则版本也会变化
         boolean revisionUpdated = calOrUpdateInstanceRevision(this.serviceInstance);
         if (revisionUpdated) {
+            // 将metadataInfo存到zk上。。。永久节点
+            // zkpath = /demo_group/metadata/dubboDemo-spring-boot/76ebbd9e0c62efdeeeeb61ff0e3fcd29
             reportMetadata(this.metadataInfo);
+            // 未暴露service meta data，所以consumer需要获取
             doRegister(this.serviceInstance);
         }
     }
 
     /**
+     * todo 后台有定时任务，每30秒看是否provider url有变化，如果有，则重新注册。。。。
      * Update assumes that DefaultServiceInstance and its attributes will never get updated once created.
      * Checking hasExportedServices() before registration guarantees that at least one service is ready for creating the
      * instance.
@@ -134,6 +147,10 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
         return this.serviceInstance;
     }
 
+    /**
+     * todo 提供给consumer调用
+     * @return
+     */
     @Override
     public MetadataInfo getLocalMetadata() {
         return this.metadataInfo;
@@ -199,6 +216,11 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
         return isDestroy;
     }
 
+    /**
+     * todo RegistryProtocol注册时调用，这里仅仅是添加到metadataInfo中，内存
+     *
+     * @param url  Registration information , is not allowed to be empty, e.g: dubbo://10.20.153.10/org.apache.dubbo.foo.BarService?version=1.0.0&application=kylin
+     */
     @Override
     public void register(URL url) {
         metadataInfo.addService(url);

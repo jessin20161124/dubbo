@@ -215,6 +215,7 @@ public class ReferenceBean<T> implements FactoryBean<T>,
         this.interfaceName = (String) beanDefinition.getAttribute(ReferenceAttributes.INTERFACE_NAME);
         Assert.notNull(this.interfaceClass, "The interface class of ReferenceBean is not initialized");
 
+        // 获取@DubboReference注解上的属性
         if (beanDefinition.hasAttribute(Constants.REFERENCE_PROPS)) {
             // @DubboReference annotation at java-config class @Bean method
             // @DubboReference annotation at reference field or setter method

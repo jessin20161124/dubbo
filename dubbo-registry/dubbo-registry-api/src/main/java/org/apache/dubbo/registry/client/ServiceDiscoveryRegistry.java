@@ -16,6 +16,26 @@
  */
 package org.apache.dubbo.registry.client;
 
+import static org.apache.dubbo.common.constants.CommonConstants.CHECK_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.DUBBO;
+import static org.apache.dubbo.common.constants.CommonConstants.GROUP_CHAR_SEPARATOR;
+import static org.apache.dubbo.common.constants.CommonConstants.INTERFACE_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.PROVIDER_SIDE;
+import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_CLUSTER_KEY;
+import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_TYPE_KEY;
+import static org.apache.dubbo.common.constants.RegistryConstants.SERVICE_REGISTRY_TYPE;
+import static org.apache.dubbo.common.function.ThrowableAction.execute;
+import static org.apache.dubbo.metadata.ServiceNameMapping.toStringKeys;
+import static org.apache.dubbo.registry.client.ServiceDiscoveryFactory.getExtension;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.common.logger.Logger;
@@ -31,27 +51,6 @@ import org.apache.dubbo.registry.client.metadata.SubscribedURLsSynthesizer;
 import org.apache.dubbo.registry.support.FailbackRegistry;
 import org.apache.dubbo.registry.support.RegistryManager;
 import org.apache.dubbo.rpc.model.ApplicationModel;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.apache.dubbo.common.constants.CommonConstants.CHECK_KEY;
-import static org.apache.dubbo.common.constants.CommonConstants.DUBBO;
-import static org.apache.dubbo.common.constants.CommonConstants.GROUP_CHAR_SEPARATOR;
-import static org.apache.dubbo.common.constants.CommonConstants.INTERFACE_KEY;
-import static org.apache.dubbo.common.constants.CommonConstants.PROTOCOL_KEY;
-import static org.apache.dubbo.common.constants.CommonConstants.PROVIDER_SIDE;
-import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_CLUSTER_KEY;
-import static org.apache.dubbo.common.constants.RegistryConstants.REGISTRY_TYPE_KEY;
-import static org.apache.dubbo.common.constants.RegistryConstants.SERVICE_REGISTRY_TYPE;
-import static org.apache.dubbo.common.function.ThrowableAction.execute;
-import static org.apache.dubbo.metadata.ServiceNameMapping.toStringKeys;
-import static org.apache.dubbo.registry.client.ServiceDiscoveryFactory.getExtension;
 
 /**
  * TODO, this bridge implementation is not necessary now, protocol can interact with service discovery directly.
@@ -194,10 +193,12 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
     public void doSubscribe(URL url, NotifyListener listener) {
         url = addRegistryClusterKey(url);
 
+        // 添加订阅信息到本地metadataInfo
         serviceDiscovery.subscribe(url, listener);
 
         boolean check = url.getParameter(CHECK_KEY, false);
 
+        // 找到该接口对应的serviceName list，然后对该service路径，例如/dubbo/service_name，添加watcher
         Set<String> subscribedServices = Collections.emptySet();
         try {
             ServiceNameMapping serviceNameMapping = ServiceNameMapping.getDefaultExtension(this.getUrl().getScopeModel());
@@ -212,7 +213,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
             }
             return;
         }
-
+        // 添加watcher
         subscribeURLs(url, listener, subscribedServices);
     }
 
@@ -290,11 +291,15 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
         synchronized (this) {
             serviceInstancesChangedListener = serviceListeners.get(serviceNamesKey);
             if (serviceInstancesChangedListener == null) {
+                // 这里创建serviceInstancesListener，底层会缓存或者查询每个instance的metadata，
+                // 缓存可用的服务信息，并通知对应的NotifyListener
+                // 缓存服务级信息，触发接口粒度通知：NotifyListener
                 serviceInstancesChangedListener = serviceDiscovery.createListener(serviceNames);
                 serviceInstancesChangedListener.setUrl(url);
                 for (String serviceName : serviceNames) {
                     List<ServiceInstance> serviceInstances = serviceDiscovery.getInstances(serviceName);
                     if (CollectionUtils.isNotEmpty(serviceInstances)) {
+                        // 第一次时，也会拿到该serviceName的所有实例，然后设置到listener的本地缓存中
                         serviceInstancesChangedListener.onEvent(new ServiceInstancesChangedEvent(serviceName, serviceInstances));
                     }
                 }
@@ -304,6 +309,7 @@ public class ServiceDiscoveryRegistry extends FailbackRegistry {
 
         serviceInstancesChangedListener.setUrl(url);
         listener.addServiceListener(serviceInstancesChangedListener);
+        // 添加该接口对应的listener，并触发调用notify listener（ServiceDiscoveryRegistryDirectory(instance url)）
         serviceInstancesChangedListener.addListenerAndNotify(protocolServiceKey, listener);
         serviceDiscovery.addServiceInstancesChangedListener(serviceInstancesChangedListener);
     }

@@ -157,6 +157,7 @@ public class DefaultModuleDeployer extends AbstractDeployer<ModuleModel> impleme
 
             // if no async export/refer services, just set started
             if (asyncExportingFutures.isEmpty() && asyncReferringFutures.isEmpty()) {
+                // 所有meta曝光后，注册服务实例到zk上
                 onModuleStarted();
             } else {
                 executorRepository.getSharedExecutor().submit(() -> {

@@ -163,7 +163,9 @@ public abstract class AbstractStream implements Stream {
 
     @Override
     public void execute(Runnable runnable) {
-        executor.execute(runnable);
+        // todo
+        runnable.run();
+//        executor.execute(runnable);
     }
 
     public String getMethodName() {

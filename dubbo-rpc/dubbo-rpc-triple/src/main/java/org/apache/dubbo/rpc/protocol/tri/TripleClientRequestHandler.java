@@ -27,6 +27,9 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 
+/**
+ * https://www.cnblogs.com/flydean/p/15665804.html
+ */
 public class TripleClientRequestHandler extends ChannelDuplexHandler {
 
     private final FrameworkModel frameworkModel;
@@ -58,6 +61,7 @@ public class TripleClientRequestHandler extends ChannelDuplexHandler {
                     DefaultFuture2.addTimeoutListener(req.getId(), channel::close);
                     WriteQueue writeQueue = new WriteQueue(channel);
                     // Start call only when the channel creation is successful
+                    System.out.println("stream 打开成功，开始往队列写数据");
                     stream.startCall(writeQueue, promise);
                 } else {
                     promise.tryFailure(future.cause());

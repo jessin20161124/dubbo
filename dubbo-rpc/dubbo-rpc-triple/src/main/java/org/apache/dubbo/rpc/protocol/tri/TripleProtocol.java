@@ -16,6 +16,10 @@
  */
 package org.apache.dubbo.rpc.protocol.tri;
 
+import static org.apache.dubbo.common.constants.CommonConstants.DEFAULT_CLIENT_THREADPOOL;
+import static org.apache.dubbo.common.constants.CommonConstants.THREADPOOL_KEY;
+
+import grpc.health.v1.HealthCheckResponse;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
@@ -31,11 +35,6 @@ import org.apache.dubbo.rpc.model.FrameworkModel;
 import org.apache.dubbo.rpc.protocol.AbstractExporter;
 import org.apache.dubbo.rpc.protocol.AbstractProtocol;
 import org.apache.dubbo.rpc.protocol.tri.service.TriBuiltinService;
-
-import grpc.health.v1.HealthCheckResponse;
-
-import static org.apache.dubbo.common.constants.CommonConstants.DEFAULT_CLIENT_THREADPOOL;
-import static org.apache.dubbo.common.constants.CommonConstants.THREADPOOL_KEY;
 
 public class TripleProtocol extends AbstractProtocol implements Protocol {
 
@@ -70,6 +69,7 @@ public class TripleProtocol extends AbstractProtocol implements Protocol {
 
         invokers.add(invoker);
 
+        // 在这里注册接口对应的invoker，收到客户端请求时，从这里获取到invoker
         pathResolver.add(url.getServiceKey(), invoker);
         pathResolver.add(url.getServiceInterface(), invoker);
 

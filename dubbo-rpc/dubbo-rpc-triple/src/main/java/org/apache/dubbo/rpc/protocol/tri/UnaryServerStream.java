@@ -17,17 +17,16 @@
 
 package org.apache.dubbo.rpc.protocol.tri;
 
+import static org.apache.dubbo.rpc.protocol.tri.GrpcStatus.getStatus;
+
+import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.stream.StreamObserver;
 import org.apache.dubbo.rpc.AppResponse;
 import org.apache.dubbo.rpc.Result;
 import org.apache.dubbo.rpc.RpcContext;
 import org.apache.dubbo.rpc.RpcInvocation;
-
-import java.util.concurrent.CompletionStage;
-import java.util.function.Function;
-
-import static org.apache.dubbo.rpc.protocol.tri.GrpcStatus.getStatus;
 
 public class UnaryServerStream extends AbstractServerStream implements Stream {
 
@@ -64,6 +63,7 @@ public class UnaryServerStream extends AbstractServerStream implements Stream {
         }
 
         public void invoke() {
+            // todo 构建invocation，并调用
             RpcInvocation invocation = buildUnaryInvocation(getHeaders(), getData());
             if (invocation == null) {
                 return;

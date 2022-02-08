@@ -17,6 +17,28 @@
 
 package org.apache.dubbo.rpc.protocol.tri;
 
+import static org.apache.dubbo.rpc.Constants.COMPRESSOR_KEY;
+import static org.apache.dubbo.rpc.protocol.tri.Compressor.DEFAULT_COMPRESSOR;
+
+import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.rpc.DebugInfo;
+import com.google.rpc.ErrorInfo;
+import com.google.rpc.Status;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.util.AsciiString;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.config.ConfigurationUtils;
 import org.apache.dubbo.common.constants.CommonConstants;
@@ -34,30 +56,6 @@ import org.apache.dubbo.rpc.model.ConsumerModel;
 import org.apache.dubbo.rpc.model.MethodDescriptor;
 import org.apache.dubbo.rpc.model.ServiceModel;
 import org.apache.dubbo.triple.TripleWrapper;
-
-import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
-import com.google.rpc.DebugInfo;
-import com.google.rpc.ErrorInfo;
-import com.google.rpc.Status;
-import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http2.Http2Headers;
-import io.netty.util.AsciiString;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.RejectedExecutionException;
-
-import static org.apache.dubbo.rpc.Constants.COMPRESSOR_KEY;
-import static org.apache.dubbo.rpc.protocol.tri.Compressor.DEFAULT_COMPRESSOR;
 
 
 /**
@@ -294,11 +292,14 @@ public abstract class AbstractClientStream extends AbstractStream implements Str
         final Object obj;
 
         if (getMethodDescriptor().isNeedWrap()) {
+            // 先进行hessian2 序列化
             obj = getRequestWrapper(value);
         } else {
             obj = getRequestValue(value);
         }
+        // 再使用protobuf进行序列化
         out = pack(obj);
+        // 最后进行压缩
         return super.compress(out);
     }
 

@@ -16,6 +16,13 @@
  */
 package org.apache.dubbo.registry.client.metadata;
 
+import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.setEndpoints;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.metadata.MetadataInfo;
@@ -24,14 +31,6 @@ import org.apache.dubbo.registry.client.ServiceInstance;
 import org.apache.dubbo.registry.client.ServiceInstanceCustomizer;
 import org.apache.dubbo.rpc.Protocol;
 import org.apache.dubbo.rpc.model.ApplicationModel;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
-
-import static org.apache.dubbo.registry.client.metadata.ServiceInstanceMetadataUtils.setEndpoints;
 
 /**
  * A Class to customize the ports of {@link Protocol protocols} into
@@ -62,6 +61,7 @@ public class ProtocolPortsMetadataCustomizer implements ServiceInstanceCustomize
             protocols.put(url.getProtocol(), url.getPort());
         });
 
+        // todo 支持多个通信协议，多个端口
         if (protocols.size() > 0) {// set endpoints only for multi-protocol scenario
             setEndpoints(serviceInstance, protocols);
         }
